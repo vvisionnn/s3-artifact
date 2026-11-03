@@ -36,6 +36,8 @@ async function main(bump: string | undefined): Promise<void> {
 		pkg.version = version;
 		await Bun.write("package.json", `${JSON.stringify(pkg, null, 2)}\n`);
 		await $`bunx biome format --write package.json`.quiet();
+		// Generated files must pass the same gate CI applies to the tagged commit.
+		await $`bunx biome ci .`.quiet();
 		await $`git add package.json CHANGELOG.md`;
 		await $`git commit -m ${`chore(release): ${tag}`}`;
 	} catch (error) {
