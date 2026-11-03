@@ -78,10 +78,10 @@ describe("S3Client objects", () => {
 
 	test("lists every key under a prefix across pages", async () => {
 		const client = clientFor(s3);
-		for (const key of ["p/a", "p/b", "p/c", "p/&d", "other/x"]) {
+		for (const key of ["p/a", "p/b", "p/c", "p/&d", "p/it's", "other/x"]) {
 			await client.putObject(key, key);
 		}
-		expect(await client.listKeys("p/")).toEqual(["p/&d", "p/a", "p/b", "p/c"]);
+		expect(await client.listKeys("p/")).toEqual(["p/&d", "p/a", "p/b", "p/c", "p/it's"]);
 		expect(await client.listKeys("none/")).toEqual([]);
 	});
 

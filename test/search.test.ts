@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { symlink } from "node:fs/promises";
 import { join, relative } from "node:path";
-import { findFilesToUpload, getMultiPathLCA } from "../src/shared/search.ts";
+import { findCaseConflicts, findFilesToUpload, getMultiPathLCA } from "../src/shared/search.ts";
 import { tempDir } from "./helpers.ts";
 
 let dir: Awaited<ReturnType<typeof tempDir>>;
@@ -89,5 +89,17 @@ describe("getMultiPathLCA", () => {
 
 	test("handles relative paths", () => {
 		expect(getMultiPathLCA([join("x", "y", "a"), join("x", "y", "b"), join("x", "z")])).toBe("x");
+	});
+});
+
+describe("findCaseConflicts", () => {
+	test("reports paths that differ only by case", () => {
+		expect(
+			findCaseConflicts(["/a/File.txt", "/a/file.txt", "/a/other.txt", "/a/FILE.TXT"]),
+		).toEqual([
+			"Uploads are case insensitive: /a/file.txt was detected that it will be overwritten by another file with the same path",
+			"Uploads are case insensitive: /a/FILE.TXT was detected that it will be overwritten by another file with the same path",
+		]);
+		expect(findCaseConflicts(["/a/x", "/a/y"])).toEqual([]);
 	});
 });

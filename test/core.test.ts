@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFile, writeFile } from "node:fs/promises";
+import { EOL } from "node:os";
 import { join } from "node:path";
 import * as core from "../src/shared/core.ts";
 import { captureStdout, parseOutputs, tempDir, withEnv } from "./helpers.ts";
@@ -47,7 +48,7 @@ describe("outputs and logging", () => {
 	test("falls back to a workflow command without GITHUB_OUTPUT", async () => {
 		restore = withEnv({ GITHUB_OUTPUT: undefined });
 		const { output } = await captureStdout(async () => core.setOutput("k", "v"));
-		expect(output).toBe("\n::set-output name=k::v\n");
+		expect(output).toBe(`${EOL}::set-output name=k::v${EOL}`);
 	});
 
 	test("escapes workflow command data", async () => {
@@ -56,12 +57,12 @@ describe("outputs and logging", () => {
 			core.debug("d");
 			core.warning("50%\r\nnext");
 		});
-		expect(output).toBe("plain 100%\n::debug::d\n::warning::50%25%0D%0Anext\n");
+		expect(output).toBe(`plain 100%${EOL}::debug::d${EOL}::warning::50%25%0D%0Anext${EOL}`);
 	});
 
 	test("setFailed reports an error and marks the process as failed", async () => {
 		const { output } = await captureStdout(async () => core.setFailed("boom"));
-		expect(output).toBe("::error::boom\n");
+		expect(output).toBe(`::error::boom${EOL}`);
 		expect(process.exitCode).toBe(1);
 	});
 });

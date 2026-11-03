@@ -127,13 +127,17 @@ describe("upload", () => {
 		await expect(runUpload()).rejects.toThrow("The artifact name is not valid");
 	});
 
-	test("rejects files with characters that are invalid on other platforms", async () => {
-		await env.dir.write("workspace/odd/what?.txt");
-		setInputs({ path: join(env.workspace, "odd") });
-		await expect(runUpload()).rejects.toThrow(
-			"The path for one of the files in artifact is not valid",
-		);
-	});
+	// Windows cannot create such files in the first place.
+	test.skipIf(process.platform === "win32")(
+		"rejects files with characters that are invalid on other platforms",
+		async () => {
+			await env.dir.write("workspace/odd/what?.txt");
+			setInputs({ path: join(env.workspace, "odd") });
+			await expect(runUpload()).rejects.toThrow(
+				"The path for one of the files in artifact is not valid",
+			);
+		},
+	);
 
 	test("hidden files are excluded by default and included on request", async () => {
 		await env.dir.write("workspace/h/.env", "secret");

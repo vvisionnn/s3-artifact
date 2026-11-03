@@ -241,8 +241,13 @@ function etagOf(body: Uint8Array): string {
 	return new Bun.CryptoHasher("md5").update(body).digest("hex");
 }
 
+/** Escapes like S3, which also emits numeric character references (for example for quotes). */
 function escapeXml(value: string): string {
-	return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+	return value
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/'/g, "&#39;");
 }
 
 function xml(body: string, status = 200): Response {

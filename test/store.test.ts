@@ -125,6 +125,12 @@ describe("ArtifactStore.upload", () => {
 		expect(s3.keys()).toEqual([]);
 	});
 
+	test("reports the original failure even when aborting also fails", async () => {
+		s3.failNext(400, (r) => r.query.includes("partNumber=2"));
+		s3.failNext(403, (r) => r.method === "DELETE");
+		await expect(upload(storeFor(), "broken", "x".repeat(40))).rejects.toThrow("400");
+	});
+
 	test("aborts the multipart upload when the source stream fails", async () => {
 		const failing = new Readable({
 			read() {
@@ -194,6 +200,28 @@ describe("ArtifactStore.upload", () => {
 
 	test("defaults to no expiry when retention is zero", async () => {
 		expect((await upload(storeFor(), "keep", "x", { retentionDays: 0 })).expiresAt).toBeNull();
+	});
+});
+
+describe("ArtifactStore defaults", () => {
+	test("generates unique numeric IDs and real timestamps without options", async () => {
+		const client = new S3Client({
+			bucket: s3.bucket,
+			endpoint: s3.endpoint,
+			region: "us-east-1",
+			accessKeyId: s3.accessKeyId,
+			secretAccessKey: "secret",
+			prefix: "",
+			forcePathStyle: true,
+			urlExpiresIn: 600,
+		});
+		const store = new ArtifactStore(client, "");
+		const before = Date.now();
+		const a = await upload(store, "a", "x", { retentionDays: 0 });
+		const b = await upload(store, "b", "y", { retentionDays: 0 });
+		expect(Number.isSafeInteger(a.id)).toBe(true);
+		expect(a.id).not.toBe(b.id);
+		expect(Date.parse(a.createdAt)).toBeGreaterThanOrEqual(before - 1000);
 	});
 });
 
@@ -277,6 +305,13 @@ describe("ArtifactStore queries", () => {
 		const manifest = await upload(store, "share", "shared");
 		const url = await store.presign(manifest);
 		expect(await (await fetch(url)).text()).toBe("shared");
+	});
+
+	test("percent-encodes RFC 3986 reserved characters in Content-Disposition", async () => {
+		await upload(storeFor(), "paren", "x", { fileName: "build (1)!.zip" });
+		expect(
+			s3.objects.get("ci/octo/repo/100/paren/build (1)!.zip")?.headers["content-disposition"],
+		).toBe(`attachment; filename="build (1)!.zip"; filename*=UTF-8''build%20%281%29%21.zip`);
 	});
 
 	test("encodes non-ASCII file names in Content-Disposition", async () => {

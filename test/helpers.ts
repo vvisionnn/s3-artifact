@@ -49,7 +49,7 @@ export function inputs(values: Record<string, string>): Record<string, string> {
 /** Parses a `GITHUB_OUTPUT` file written by `@actions/core`. */
 export function parseOutputs(text: string): Record<string, string> {
 	const outputs: Record<string, string> = {};
-	const pattern = /^(.+?)<<(ghadelimiter_[^\n]+)\n([\s\S]*?)\n\2$/gm;
+	const pattern = /^(.+?)<<(ghadelimiter_[^\r\n]+)\r?\n([\s\S]*?)\r?\n\2\r?$/gm;
 	for (const [, name, , value] of text.matchAll(pattern)) {
 		outputs[name ?? ""] = value ?? "";
 	}
