@@ -1,0 +1,56 @@
+name: "Merge Build Artifacts in S3"
+description: "Drop-in replacement for actions/upload-artifact/merge that merges artifacts stored in an S3-compatible bucket."
+author: "vvisionnn"
+branding:
+  icon: "layers"
+  color: "blue"
+inputs:
+  name:
+    description: "The name of the artifact that the artifacts will be merged into."
+    required: true
+    default: "merged-artifacts"
+  pattern:
+    description: "A glob pattern matching the artifact names that should be merged."
+    default: "*"
+  separate-directories:
+    description: "If true, each matched artifact is placed in a directory named after it. If false, all files are combined in the same directory."
+    default: "false"
+  retention-days:
+    description: "Duration after which the artifact expires, in days. 0 means the default retention (`GITHUB_RETENTION_DAYS`, else 90). Expired artifacts become invisible; add a bucket lifecycle rule to reclaim the space."
+  compression-level:
+    description: "Zlib compression level for the archive, 0 (none) to 9 (best). For large files that do not compress well, 0 is significantly faster."
+    default: "6"
+  delete-merged:
+    description: "If true, the artifacts that were merged are deleted."
+    default: "false"
+  include-hidden-files:
+    description: "If true, hidden files are included in the merged artifact."
+    default: "false"
+  s3-bucket:
+    description: "Bucket that stores the artifacts. Falls back to `ARTIFACT_S3_BUCKET`."
+  s3-endpoint:
+    description: "S3 endpoint URL, e.g. `https://s3.example.com`. Falls back to `ARTIFACT_S3_ENDPOINT`, `AWS_ENDPOINT_URL_S3`, `AWS_ENDPOINT_URL`, then AWS S3 for the region."
+  s3-region:
+    description: "Signing region. Falls back to `ARTIFACT_S3_REGION`, `AWS_REGION`, `AWS_DEFAULT_REGION`, then `us-east-1`."
+  s3-access-key-id:
+    description: "Access key ID. Falls back to `ARTIFACT_S3_ACCESS_KEY_ID`, then `AWS_ACCESS_KEY_ID`."
+  s3-secret-access-key:
+    description: "Secret access key. Falls back to `ARTIFACT_S3_SECRET_ACCESS_KEY`, then `AWS_SECRET_ACCESS_KEY`."
+  s3-session-token:
+    description: "Optional session token for temporary credentials. Falls back to `ARTIFACT_S3_SESSION_TOKEN`, then `AWS_SESSION_TOKEN`."
+  s3-prefix:
+    description: "Optional key prefix inside the bucket. Falls back to `ARTIFACT_S3_PREFIX`."
+  s3-force-path-style:
+    description: "Use path-style URLs (`endpoint/bucket/key`). Defaults to `true` for custom endpoints and `false` for AWS. Falls back to `ARTIFACT_S3_FORCE_PATH_STYLE`."
+  s3-url-expires-in:
+    description: "Lifetime in seconds of the presigned `artifact-url` output, 1 to 604800 (7 days, the default). Falls back to `ARTIFACT_S3_URL_EXPIRES_IN`."
+outputs:
+  artifact-id:
+    description: "A unique identifier for the artifact that was just uploaded. Use it with the `artifact-ids` input of the download action."
+  artifact-url:
+    description: "A presigned download URL for the artifact (valid for `s3-url-expires-in` seconds, 7 days by default). Anyone holding the URL can download the artifact."
+  artifact-digest:
+    description: "SHA-256 digest of the artifact that was just uploaded."
+runs:
+  using: "node24"
+  main: "../../dist/merge/index.js"
