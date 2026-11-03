@@ -1,6 +1,6 @@
 {
 	"name": "s3-artifact",
-	"version": "0.0.0",
+	"version": "1.0.0",
 	"private": true,
 	"description": "Drop-in replacement for actions/upload-artifact and actions/download-artifact backed by any S3-compatible storage",
 	"license": "MIT",
