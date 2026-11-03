@@ -1189,6 +1189,9 @@ function guessServiceRegion(url, headers) {
   return [HOST_SERVICES[service] || service, region || ""];
 }
 
+// src/shared/delay.ts
+var delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // src/shared/transport.ts
 import http from "node:http";
 import https from "node:https";
@@ -1243,7 +1246,6 @@ class S3Error extends Error {
 }
 var BASE_DELAY_MS = 250;
 var MAX_DELAY_MS = 1e4;
-var defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 class S3Client {
   config;
@@ -1262,7 +1264,7 @@ class S3Client {
       retries: 0
     });
     this.retries = options2.retries ?? 5;
-    this.sleep = options2.sleep ?? defaultSleep;
+    this.sleep = options2.sleep ?? delay;
     this.send = options2.transport ?? nodeTransport();
   }
   objectUrl(key) {
@@ -1432,7 +1434,7 @@ class ArtifactStore {
     this.concurrency = options2.concurrency ?? 4;
     this.now = options2.now ?? (() => new Date);
     this.generateId = options2.generateId ?? (() => Date.now() * 1000 + randomInt(1000));
-    this.sleep = options2.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    this.sleep = options2.sleep ?? delay;
   }
   async upload(run, request) {
     const existing = await this.get(run, request.name);
@@ -4087,6 +4089,15 @@ function getMultiPathLCA(searchPaths) {
   }
   return join2(...common);
 }
+function findCaseConflicts(files) {
+  const seen = new Set;
+  return files.filter((file) => {
+    const key = file.toLowerCase();
+    const duplicate = seen.has(key);
+    seen.add(key);
+    return duplicate;
+  }).map((file) => `Uploads are case insensitive: ${file} was detected that it will be overwritten by another file with the same path`);
+}
 async function findFilesToUpload(searchPath, includeHiddenFiles = false) {
   const globber = await create(searchPath, {
     followSymbolicLinks: true,
@@ -4095,18 +4106,11 @@ async function findFilesToUpload(searchPath, includeHiddenFiles = false) {
     excludeHiddenFiles: !includeHiddenFiles
   });
   const filesToUpload = [];
-  const seen = new Set;
   for (const result of await globber.glob()) {
-    if ((await stat(result)).isDirectory()) {
-      continue;
-    }
-    filesToUpload.push(result);
-    const key = result.toLowerCase();
-    if (seen.has(key)) {
-      info(`Uploads are case insensitive: ${result} was detected that it will be overwritten by another file with the same path`);
-    }
-    seen.add(key);
+    if (!(await stat(result)).isDirectory())
+      filesToUpload.push(result);
   }
+  findCaseConflicts(filesToUpload).forEach(info);
   const searchPaths = globber.getSearchPaths();
   if (searchPaths.length > 1) {
     const rootDirectory = getMultiPathLCA(searchPaths);

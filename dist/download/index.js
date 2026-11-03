@@ -4911,6 +4911,9 @@ function guessServiceRegion(url, headers) {
   return [HOST_SERVICES[service] || service, region || ""];
 }
 
+// src/shared/delay.ts
+var delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // src/shared/transport.ts
 import http from "node:http";
 import https from "node:https";
@@ -4965,7 +4968,6 @@ class S3Error extends Error {
 }
 var BASE_DELAY_MS = 250;
 var MAX_DELAY_MS = 1e4;
-var defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 class S3Client {
   config;
@@ -4984,7 +4986,7 @@ class S3Client {
       retries: 0
     });
     this.retries = options2.retries ?? 5;
-    this.sleep = options2.sleep ?? defaultSleep;
+    this.sleep = options2.sleep ?? delay;
     this.send = options2.transport ?? nodeTransport();
   }
   objectUrl(key) {
@@ -5154,7 +5156,7 @@ class ArtifactStore {
     this.concurrency = options2.concurrency ?? 4;
     this.now = options2.now ?? (() => new Date);
     this.generateId = options2.generateId ?? (() => Date.now() * 1000 + randomInt(1000));
-    this.sleep = options2.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    this.sleep = options2.sleep ?? delay;
   }
   async upload(run, request) {
     const existing = await this.get(run, request.name);

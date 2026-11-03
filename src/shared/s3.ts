@@ -1,5 +1,6 @@
 import { AwsClient } from "aws4fetch";
 import type { S3Config } from "./config.ts";
+import { delay } from "./delay.ts";
 import { nodeTransport, type Transport } from "./transport.ts";
 
 export interface S3ClientOptions {
@@ -28,8 +29,6 @@ export class S3Error extends Error {
 const BASE_DELAY_MS = 250;
 const MAX_DELAY_MS = 10_000;
 
-const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
-
 /** Small S3 client built on SigV4 + Node HTTP/1.1: just the operations artifacts need, with retries. */
 export class S3Client {
 	private readonly signer: AwsClient;
@@ -50,7 +49,7 @@ export class S3Client {
 			retries: 0,
 		});
 		this.retries = options.retries ?? 5;
-		this.sleep = options.sleep ?? defaultSleep;
+		this.sleep = options.sleep ?? delay;
 		this.send = options.transport ?? nodeTransport();
 	}
 

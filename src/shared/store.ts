@@ -5,6 +5,7 @@ import { dirname } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import * as core from "./core.ts";
+import { delay } from "./delay.ts";
 import { type CompletedPart, type S3Client, S3Error } from "./s3.ts";
 
 /** Identifies the workflow run that owns a set of artifacts. */
@@ -86,7 +87,7 @@ export class ArtifactStore {
 		this.now = options.now ?? (() => new Date());
 		// Millisecond timestamp plus entropy: unique per artifact and a safe integer like GitHub IDs.
 		this.generateId = options.generateId ?? (() => Date.now() * 1000 + randomInt(1000));
-		this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+		this.sleep = options.sleep ?? delay;
 	}
 
 	async upload(run: RunRef, request: UploadRequest): Promise<ArtifactManifest> {

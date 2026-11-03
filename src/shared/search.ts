@@ -32,6 +32,22 @@ export function getMultiPathLCA(searchPaths: string[]): string {
 	return join(...common);
 }
 
+/** Notices for paths that collide with an earlier path when compared case-insensitively. */
+export function findCaseConflicts(files: string[]): string[] {
+	const seen = new Set<string>();
+	return files
+		.filter((file) => {
+			const key = file.toLowerCase();
+			const duplicate = seen.has(key);
+			seen.add(key);
+			return duplicate;
+		})
+		.map(
+			(file) =>
+				`Uploads are case insensitive: ${file} was detected that it will be overwritten by another file with the same path`,
+		);
+}
+
 export async function findFilesToUpload(
 	searchPath: string,
 	includeHiddenFiles = false,
@@ -44,21 +60,11 @@ export async function findFilesToUpload(
 	});
 
 	const filesToUpload: string[] = [];
-	const seen = new Set<string>();
 	for (const result of await globber.glob()) {
 		// stat (not lstat) so symlinked directories are skipped like real ones.
-		if ((await stat(result)).isDirectory()) {
-			continue;
-		}
-		filesToUpload.push(result);
-		const key = result.toLowerCase();
-		if (seen.has(key)) {
-			core.info(
-				`Uploads are case insensitive: ${result} was detected that it will be overwritten by another file with the same path`,
-			);
-		}
-		seen.add(key);
+		if (!(await stat(result)).isDirectory()) filesToUpload.push(result);
 	}
+	findCaseConflicts(filesToUpload).forEach(core.info);
 
 	const searchPaths = globber.getSearchPaths();
 	if (searchPaths.length > 1) {
