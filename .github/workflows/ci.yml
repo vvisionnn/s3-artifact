@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: Lint, types, tests, bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: bun install --frozen-lockfile
+      - name: Lint and format
+        run: bunx biome ci .
+      - name: Type check (TypeScript 7)
+        run: bun run typecheck
+      - name: Tests with coverage gate (95%)
+        run: bun test --coverage
+      - name: Bundle
+        run: bun run build
+      - name: Committed dist/ matches the sources
+        run: |
+          if [ -n "$(git status --porcelain dist)" ]; then
+            git status --porcelain dist
+            echo "::error::dist/ is out of date. Run 'bun run build' and commit the result."
+            exit 1
+          fi
+
+  test:
+    name: Tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: bun install --frozen-lockfile
+      - run: bun test
+
+  e2e:
+    name: End to end (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - name: Start fake S3
+        run: bun test/e2e/start-fake-s3.ts
+      - uses: ./.github/actions/e2e-scenario
+
+  e2e-seaweedfs:
+    name: End to end (real SeaweedFS)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SEAWEEDFS_VERSION: "4.52"
+      ARTIFACT_S3_ENDPOINT: http://127.0.0.1:8333
+      ARTIFACT_S3_BUCKET: artifacts
+      AWS_ACCESS_KEY_ID: ci-key
+      AWS_SECRET_ACCESS_KEY: ci-secret
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Start SeaweedFS
+        run: |
+          cat > "$RUNNER_TEMP/s3.json" <<'JSON'
+          {"identities":[{"name":"ci","credentials":[{"accessKey":"ci-key","secretKey":"ci-secret"}],"actions":["Admin","Read","List","Tagging","Write"]}]}
+          JSON
+          docker run -d --name seaweedfs -p 8333:8333 -v "$RUNNER_TEMP/s3.json:/etc/s3.json:ro" \
+            "chrislusf/seaweedfs:$SEAWEEDFS_VERSION" server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/s3.json -volume.max=0
+          # Bounded wait for the S3 port to answer (any HTTP status means it is serving).
+          curl -sS -o /dev/null --retry 60 --retry-delay 1 --retry-connrefused --retry-all-errors "$ARTIFACT_S3_ENDPOINT/"
+          status=$(curl -sS -o /dev/null -w '%{http_code}' -X PUT --aws-sigv4 aws:amz:us-east-1:s3 \
+            --user "$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY" "$ARTIFACT_S3_ENDPOINT/$ARTIFACT_S3_BUCKET")
+          [ "$status" = 200 ] || [ "$status" = 409 ] || { docker logs seaweedfs; exit 1; }
+      - uses: ./.github/actions/e2e-scenario
+      - name: SeaweedFS logs
+        if: failure()
+        run: docker logs seaweedfs

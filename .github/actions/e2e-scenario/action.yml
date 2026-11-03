@@ -1,0 +1,116 @@
+name: "e2e scenario"
+description: "Runs upload, merge and download against the S3 endpoint configured in the environment, then verifies every result."
+runs:
+  using: "composite"
+  steps:
+    - name: Create fixtures
+      shell: bash
+      run: |
+        rm -rf e2e && mkdir -p e2e/src/app/nested e2e/src/logs
+        echo "hello" > e2e/src/app/hello.txt
+        echo "nested" > e2e/src/app/nested/deep.txt
+        echo "hidden" > e2e/src/app/.hidden
+        printf '#!/bin/sh\necho ok\n' > e2e/src/app/run.sh && chmod +x e2e/src/app/run.sh
+        echo "log line" > e2e/src/logs/run.log
+        # 20 MiB of random data forces a multipart upload (16 MiB parts).
+        head -c 20971520 /dev/urandom > e2e/src/big.bin
+
+    - name: Upload a directory
+      uses: ./upload
+      with:
+        name: app
+        path: e2e/src/app
+
+    - name: Upload with a wildcard
+      uses: ./upload
+      with:
+        name: logs
+        path: e2e/src/logs/*.log
+        retention-days: 1
+
+    - name: Upload a single file without archiving
+      id: raw
+      uses: ./upload
+      with:
+        path: e2e/src/big.bin
+        archive: false
+
+    - name: Duplicate name fails
+      id: duplicate
+      continue-on-error: true
+      uses: ./upload
+      with:
+        name: app
+        path: e2e/src/app
+
+    - name: Overwrite with hidden files
+      uses: ./upload
+      with:
+        name: app
+        path: e2e/src/app
+        overwrite: true
+        include-hidden-files: true
+
+    - name: Merge artifacts
+      uses: ./upload/merge
+      with:
+        name: merged
+        pattern: "{app,logs}"
+        separate-directories: true
+
+    - name: Download by name
+      uses: ./download
+      with:
+        name: app
+        path: e2e/out/app
+
+    - name: Download everything
+      id: all
+      uses: ./download
+      with:
+        path: e2e/out/all
+
+    - name: Download by ID
+      uses: ./download
+      with:
+        artifact-ids: ${{ steps.raw.outputs.artifact-id }}
+        path: e2e/out/ids
+
+    - name: Download without decompressing
+      uses: ./download
+      with:
+        name: merged
+        path: e2e/out/zip
+        skip-decompress: true
+
+    - name: Verify results
+      shell: bash
+      env:
+        DUPLICATE_OUTCOME: ${{ steps.duplicate.outcome }}
+        RAW_DIGEST: ${{ steps.raw.outputs.artifact-digest }}
+        RAW_URL: ${{ steps.raw.outputs.artifact-url }}
+        ALL_PATH: ${{ steps.all.outputs.download-path }}
+      run: |
+        set -euo pipefail
+        fail() { echo "::error::$1"; exit 1; }
+        sha() { if command -v sha256sum >/dev/null; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d' ' -f1; }
+
+        [ "$DUPLICATE_OUTCOME" = "failure" ] || fail "duplicate upload should fail, got $DUPLICATE_OUTCOME"
+        [ "$(cat e2e/out/app/hello.txt)" = "hello" ] || fail "hello.txt content"
+        [ "$(cat e2e/out/app/nested/deep.txt)" = "nested" ] || fail "nested layout"
+        [ -f e2e/out/app/.hidden ] || fail "overwrite with include-hidden-files"
+        if [ "$RUNNER_OS" != "Windows" ]; then [ -x e2e/out/app/run.sh ] || fail "executable bit"; fi
+
+        [ -f e2e/out/all/logs/run.log ] || fail "download all: logs"
+        cmp e2e/src/big.bin e2e/out/all/big.bin/big.bin || fail "download all: raw file"
+        [ "$(cat e2e/out/all/merged/app/hello.txt)" = "hello" ] || fail "merged separate directories"
+        [ "$(cat e2e/out/all/merged/logs/run.log)" = "log line" ] || fail "merged logs"
+        [ -n "$ALL_PATH" ] || fail "download-path output"
+
+        cmp e2e/src/big.bin e2e/out/ids/big.bin || fail "download by id"
+        [ -f e2e/out/zip/merged.zip ] || fail "skip-decompress keeps merged.zip"
+
+        [ "$(sha e2e/src/big.bin)" = "$RAW_DIGEST" ] || fail "artifact-digest output"
+        curl -sSf "$RAW_URL" -o e2e/out/presigned.bin
+        cmp e2e/src/big.bin e2e/out/presigned.bin || fail "artifact-url presigned download"
+        echo "All end-to-end checks passed on $RUNNER_OS"
