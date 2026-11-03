@@ -5,6 +5,7 @@
  * pushes. Pushing the tag triggers .github/workflows/release.yml, which publishes the GitHub
  * release and moves the floating major tag (for example `v1`).
  */
+import { rm } from "node:fs/promises";
 import { $ } from "bun";
 import { nextVersion } from "./version.ts";
 
@@ -30,12 +31,24 @@ async function main(bump: string | undefined): Promise<void> {
 		throw new Error("dist/ is out of date; commit the rebuilt bundles first.");
 	}
 
-	pkg.version = version;
-	await Bun.write("package.json", `${JSON.stringify(pkg, null, 2)}\n`);
-	await $`bunx git-cliff --tag ${tag} --output CHANGELOG.md`;
-	await $`bunx biome format --write package.json`.quiet();
-	await $`git add package.json CHANGELOG.md`;
-	await $`git commit -m ${`chore(release): ${tag}`}`;
+	try {
+		await $`bunx git-cliff --tag ${tag} --output CHANGELOG.md`.quiet();
+		pkg.version = version;
+		await Bun.write("package.json", `${JSON.stringify(pkg, null, 2)}\n`);
+		await $`bunx biome format --write package.json`.quiet();
+		await $`git add package.json CHANGELOG.md`;
+		await $`git commit -m ${`chore(release): ${tag}`}`;
+	} catch (error) {
+		// Leave the tree exactly as it was so the release can simply be retried.
+		await $`git reset -q -- package.json CHANGELOG.md`.nothrow().quiet();
+		await $`git checkout -- package.json`.nothrow().quiet();
+		if ((await $`git ls-files CHANGELOG.md`.text()).trim()) {
+			await $`git checkout -- CHANGELOG.md`.nothrow().quiet();
+		} else {
+			await rm("CHANGELOG.md", { force: true });
+		}
+		throw error;
+	}
 	await $`git tag -a ${tag} -m ${tag}`;
 	await $`git push --atomic origin main ${tag}`;
 	console.log(`Pushed ${tag}. The release workflow publishes it.`);
