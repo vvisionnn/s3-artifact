@@ -29,6 +29,7 @@ All notable changes to this project are documented here. Versions follow [Semant
 
 - Cross-platform tests, end-to-end runs on fake S3 and SeaweedFS, tag-driven releases ([`01f5c64`](https://github.com/vvisionnn/s3-artifact/commit/01f5c64fdafea338665c125035d7379ad0467463))
 - Release script with git-cliff changelog ([`22b723d`](https://github.com/vvisionnn/s3-artifact/commit/22b723dfcb8de3685eb24d14eca390a701ee254c))
+- Keep the generated changelog out of formatting checks ([`d686a9a`](https://github.com/vvisionnn/s3-artifact/commit/d686a9af14da196ef3242aff0579b523a313f1e8))
 
 ### 🧹 Chores
 
