@@ -65,6 +65,8 @@ env:
 + - uses: vvisionnn/s3-artifact/upload/merge@v1
 ```
 
+`vvisionnn/s3-artifact@v1` (the repository root, as listed on the Marketplace) is the same as `vvisionnn/s3-artifact/upload@v1`.
+
 <details>
 <summary><b>Complete workflow example</b></summary>
 
