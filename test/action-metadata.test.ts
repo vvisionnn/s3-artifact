@@ -104,3 +104,22 @@ test("every s3-* input is read by the configuration resolver", async () => {
 		expect(source).toContain(`"${name}"`);
 	}
 });
+
+describe("root action.yml (Marketplace listing)", () => {
+	test("is the upload action under a unique name", async () => {
+		const root = (await Bun.YAML.parse(await Bun.file("action.yml").text())) as ActionYaml & {
+			name: string;
+			description: string;
+			branding: { icon: string; color: string };
+		};
+		const upload = await load("upload/action.yml");
+		expect(root.name).toBe("S3 Artifact");
+		expect(root.inputs).toEqual(upload.inputs);
+		expect(root.outputs).toEqual(upload.outputs);
+		expect(root.runs).toEqual({ using: "node24", main: "dist/upload/index.js" });
+		expect(root.branding.icon).toBeTruthy();
+		expect(root.branding.color).toBeTruthy();
+		// Marketplace rejects descriptions longer than 125 characters.
+		expect(root.description.length).toBeLessThanOrEqual(125);
+	});
+});

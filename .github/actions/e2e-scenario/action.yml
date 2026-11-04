@@ -28,6 +28,12 @@ runs:
         path: e2e/src/logs/*.log
         retention-days: 1
 
+    - name: Upload through the root action (Marketplace entry point)
+      uses: ./
+      with:
+        name: root
+        path: e2e/src/logs
+
     - name: Upload a single file without archiving
       id: raw
       uses: ./upload
@@ -102,6 +108,7 @@ runs:
         if [ "$RUNNER_OS" != "Windows" ]; then [ -x e2e/out/app/run.sh ] || fail "executable bit"; fi
 
         [ -f e2e/out/all/logs/run.log ] || fail "download all: logs"
+        [ "$(cat e2e/out/all/root/run.log)" = "log line" ] || fail "root action upload"
         cmp e2e/src/big.bin e2e/out/all/big.bin/big.bin || fail "download all: raw file"
         [ "$(cat e2e/out/all/merged/app/hello.txt)" = "hello" ] || fail "merged separate directories"
         [ "$(cat e2e/out/all/merged/logs/run.log)" = "log line" ] || fail "merged logs"
