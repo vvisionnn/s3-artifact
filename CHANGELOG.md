@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented here. Versions follow [Semantic Versioning](https://semver.org).
 
+## [1.1.0](https://github.com/vvisionnn/s3-artifact/compare/v1.0.0...v1.1.0) - 2026-11-04
+
+### 🚀 Features
+
+- Root action.yml so the repository can be listed on GitHub Marketplace ([`d10d7ef`](https://github.com/vvisionnn/s3-artifact/commit/d10d7efc0e3ef80733e633a9e07194b800ac32a4))
+
+### 📚 Documentation
+
+- Mention the root action shorthand ([`d3f10ca`](https://github.com/vvisionnn/s3-artifact/commit/d3f10ca59cd02d62722157ccf38732c5fa10165c))
 ## [1.0.0](https://github.com/vvisionnn/s3-artifact/releases/tag/v1.0.0) - 2026-11-03
 
 ### 🚀 Features
