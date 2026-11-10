@@ -22,12 +22,12 @@
 	"dependencies": {
 		"@actions/glob": "^0.7.0",
 		"aws4fetch": "^1.0.20",
-		"minimatch": "^11.0.4",
+		"minimatch": "^11.0.5",
 		"yauzl": "^3.4.0",
 		"yazl": "^3.3.1"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.6.4",
+		"@biomejs/biome": "^2.6.6",
 		"@types/bun": "^1.4.4",
 		"@types/node": "^26.6.6",
 		"@types/yauzl": "^3.4.0",
